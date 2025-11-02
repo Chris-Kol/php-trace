@@ -146,8 +146,8 @@ jobs:
           curl -f http://localhost:8000/web.php?TRACE=1 || true
           kill $SERVER_PID
 
-  integration:
-    name: Integration Tests
+  e2e-verification:
+    name: End-to-End Verification
     runs-on: ubuntu-latest
     needs: [test, compatibility]
 
@@ -167,41 +167,60 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
 
-      - name: Run integration tests
+      - name: Verify tracing works end-to-end
         run: |
-          # Test actual tracing end-to-end
           cd examples
+
+          # Run sample with tracing enabled
+          echo "Running sample.php with TRACE=1..."
           TRACE=1 php -d auto_prepend_file=../src/bootstrap.php sample.php
 
-          # Verify trace files were created
-          echo "Checking for trace files..."
-          if ls /tmp/php-trace-* 1> /dev/null 2>&1; then
-            echo "✅ Trace files found:"
-            ls -la /tmp/php-trace-*
-          else
-            echo "ℹ️ No trace files in /tmp (may be in traces/ directory)"
-            if [ -d "../traces" ]; then
-              ls -la ../traces/ || echo "traces/ directory is empty"
-            fi
+          # Verify trace files were generated
+          echo ""
+          echo "Verifying trace files were created..."
+
+          TRACE_DIR="traces"
+          if [ ! -d "$TRACE_DIR" ]; then
+            echo "❌ ERROR: traces/ directory not found"
+            exit 1
           fi
 
-      - name: Test with test project
-        run: |
-          # If test-project exists, test integration there
-          if [ -d "../test-project" ]; then
-            echo "✅ Test project found, running integration test"
-            cd ../test-project
-            php -S localhost:8001 -d auto_prepend_file=vendor/php-trace/php-trace/src/bootstrap.php -d xdebug.mode=trace &
-            SERVER_PID=$!
-            sleep 2
+          # Check for JSON and MD files
+          JSON_COUNT=$(find "$TRACE_DIR" -name "*.json" -type f | wc -l)
+          MD_COUNT=$(find "$TRACE_DIR" -name "*.md" -type f | wc -l)
 
-            if curl -f "http://localhost:8001/?TRACE=1"; then
-              echo "✅ Integration test passed"
-            else
-              echo "⚠️ Integration test returned non-zero exit code (may be expected)"
-            fi
+          echo "Found $JSON_COUNT JSON file(s) and $MD_COUNT Markdown file(s)"
 
-            kill $SERVER_PID
-          else
-            echo "ℹ️ Test project not available, skipping"
+          if [ "$JSON_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: No JSON trace files generated"
+            ls -la "$TRACE_DIR"
+            exit 1
           fi
+
+          if [ "$MD_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: No Markdown trace files generated"
+            ls -la "$TRACE_DIR"
+            exit 1
+          fi
+
+          # Verify JSON is valid
+          echo ""
+          echo "Validating JSON structure..."
+          LATEST_JSON=$(find "$TRACE_DIR" -name "*.json" -type f | head -1)
+
+          if ! jq -e '.meta.total_time_ms' "$LATEST_JSON" > /dev/null; then
+            echo "❌ ERROR: Invalid JSON structure (missing meta.total_time_ms)"
+            cat "$LATEST_JSON"
+            exit 1
+          fi
+
+          if ! jq -e '.trace' "$LATEST_JSON" > /dev/null; then
+            echo "❌ ERROR: Invalid JSON structure (missing trace)"
+            cat "$LATEST_JSON"
+            exit 1
+          fi
+
+          echo "✅ All verifications passed!"
+          echo ""
+          echo "Generated trace files:"
+          ls -lh "$TRACE_DIR"
