@@ -1,24 +1,25 @@
 # PHP Trace
 
-<!-- CI/CD Badges - Will be added when GitHub Actions are set up -->
-<!--
 [![CI](https://github.com/Chris-Kol/php-trace/workflows/CI/badge.svg)](https://github.com/Chris-Kol/php-trace/actions)
 [![Coverage](https://codecov.io/gh/Chris-Kol/php-trace/branch/main/graph/badge.svg)](https://codecov.io/gh/Chris-Kol/php-trace)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%208-brightgreen.svg)](https://phpstan.org/)
 [![PHP Version](https://img.shields.io/badge/PHP-8.0%2B-blue.svg)](https://www.php.net/)
--->
+[![Latest Release](https://img.shields.io/github/v/release/Chris-Kol/php-trace)](https://github.com/Chris-Kol/php-trace/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Lightweight PHP execution tracer optimized for LLM-friendly debugging.
 
-## What's New in v2.0
+## What's New in v1.0.0
+
+🎉 **First stable release!**
 
 - ✨ **Configuration System**: Customize behavior with `phptrace.php` config file
 - 🎛️ **Configurable Filtering**: Choose what to exclude from traces (vendor/, tests/, etc.)
 - 🚀 **PHP 8.0+ Required**: Now using modern PHP features
-- ✅ **Quality Tools**: PSR-12 compliant, PHPStan level 8, comprehensive tests
+- ✅ **Quality Tools**: PSR-12 compliant, PHPStan level 8, comprehensive tests (146 tests, 74% coverage)
 - 📦 **Better Defaults**: Smart config discovery, cleaner output structure
-
-**Migration from v1**: The old setup still works! Just note the PHP version requirement changed to 8.0+.
+- 🔒 **Security**: Automated security scanning and dependency auditing
+- 🤖 **CI/CD**: Full GitHub Actions pipeline with multi-version PHP testing
 
 ## The Problem
 
@@ -53,12 +54,27 @@ PHP Trace captures execution paths automatically and outputs them in formats opt
 
 ### Installation via Composer
 
+**For production projects** (from Packagist - coming soon):
 ```bash
 composer require --dev php-trace/php-trace
 ```
 
-Or for local development:
+**For local development** (from GitHub):
+```json
+{
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/Chris-Kol/php-trace"
+    }
+  ],
+  "require-dev": {
+    "php-trace/php-trace": "^1.0"
+  }
+}
+```
 
+**For local path development:**
 ```json
 {
   "repositories": [
@@ -144,54 +160,22 @@ TRACE=1 TRACE_OUTPUT_DIR=./traces php your-script.php
 
 ## Docker Integration
 
-### For Dockerized Projects
+For Docker projects, install via Composer and configure in your PHP container:
 
-**1. Update `composer.json`:**
-
-```json
-{
-  "repositories": [
-    {
-      "type": "path",
-      "url": "../php-trace"
-    }
-  ],
-  "require-dev": {
-    "php-trace/php-trace": "@dev"
-  }
-}
-```
-
-**2. Update `docker/php/xdebug.ini`:**
-
-Add `trace` to xdebug.mode:
-```ini
-xdebug.mode = coverage,debug,develop,trace
-```
-
-**3. Update `docker/php/php.ini`:**
-
-Add auto-prepend:
-```ini
+```dockerfile
+# In your Dockerfile or php.ini
 auto_prepend_file=/var/www/html/vendor/php-trace/php-trace/src/bootstrap.php
+
+# In your xdebug.ini
+xdebug.mode=trace
 ```
 
-**4. Add to `.env`:**
-
-```env
-TRACE=1
-TRACE_OUTPUT_DIR=/var/www/html/traces
+Enable tracing via environment variable:
+```yaml
+# docker-compose.yml
+environment:
+  - TRACE=1
 ```
-
-**5. Create traces directory and rebuild:**
-
-```bash
-mkdir traces
-docker-compose build
-docker-compose up -d
-```
-
-Done! All requests to your Docker container will be traced.
 
 ## Output
 
@@ -266,75 +250,25 @@ The LLM will immediately see:
 
 ## Configuration
 
-### phptrace.php Config File (Recommended)
+### Optional: phptrace.php Config File
 
-Create a `phptrace.php` file in your project root to customize behavior:
-
-```php
-<?php
-// phptrace.php
-
-return [
-    /**
-     * Patterns to exclude from traces
-     * Set to [] to include vendor code
-     */
-    'exclude_patterns' => [
-        'vendor/',
-        'composer/',
-        // Add more patterns as needed
-    ],
-
-    /**
-     * Directory to write trace files
-     */
-    'output_dir' => 'traces',
-
-    /**
-     * Output formats to generate
-     */
-    'formats' => ['json', 'markdown'],
-];
-```
-
-A template is provided at `phptrace.php.dist`. Copy it to get started:
-
-```bash
-cp vendor/php-trace/php-trace/phptrace.php.dist phptrace.php
-```
-
-**Config File Discovery:**
-PHP-Trace automatically looks for `phptrace.php` in:
-1. Current directory
-2. Parent directories (up to 5 levels)
-
-**Example: Include Vendor Code**
-
-To debug third-party libraries:
+Create `phptrace.php` in your project root to customize:
 
 ```php
 <?php
 return [
-    'exclude_patterns' => [], // Include everything!
-    'output_dir' => 'traces',
-    'formats' => ['json', 'markdown'],
+    'exclude_patterns' => ['vendor/', 'tests/'],  // What to exclude
+    'output_dir' => 'traces',                      // Where to save
+    'formats' => ['json', 'markdown'],             // Output formats
 ];
 ```
 
 ### Environment Variables
 
-Environment variables have the highest priority and override config file settings:
-
 - `TRACE=1` - Enable tracing
-- `TRACE_OUTPUT_DIR=./traces` - Custom output directory (overrides `phptrace.php` config)
+- `TRACE_OUTPUT_DIR=./traces` - Custom output directory
 
-**Priority Order for Output Directory:**
-1. Environment variable: `TRACE_OUTPUT_DIR`
-2. Config file: `phptrace.php` → `'output_dir'`
-3. Default: `traces/` (relative to project root)
-
-### Activation Priority (highest to lowest)
-
+**Activation Methods (in priority order):**
 1. Environment variable: `TRACE=1`
 2. `.env` file: `TRACE=1`
 3. Query parameter: `?TRACE=1`
@@ -342,95 +276,38 @@ Environment variables have the highest priority and override config file setting
 
 ## How It Works
 
-1. Bootstrap checks if tracing is enabled (env, .env, query param, or cookie)
-2. If enabled, starts Xdebug function trace with `xdebug.mode=trace`
-3. Script executes normally
-4. On shutdown:
-   - Loads configuration from `phptrace.php` (if exists)
-   - Parses the Xdebug trace file
-   - Detects project root (looks for `composer.json`, `.git`, or `src/`)
-   - Converts absolute paths to relative paths
-   - Builds hierarchical call tree with timing
-   - Filters code based on config (default: excludes `vendor/` and `composer/`)
-   - Generates both JSON and Markdown outputs
-   - Cleans up raw trace files
+1. Checks if tracing is enabled (env, .env, query param, or cookie)
+2. Starts Xdebug function trace
+3. On request completion, generates JSON and Markdown outputs with hierarchical call tree
+4. Automatically filters vendor code and converts to relative paths
 
 ## Performance
 
-- **Overhead when tracing**: 2-7x slowdown (development only)
-- **Overhead when not tracing**: Near-zero (just checks if enabled)
-- **File size**: ~1-5KB per trace (depends on call depth)
-
-## Examples
-
-See the `examples/` directory:
-- `sample.php` - CLI script example
-- `web.php` - Web application example
-- `test_without_xdebug.php` - Test components without Xdebug
-
-See the `test-project/` for a complete working example with Composer integration.
+⚠️ **Important**: Xdebug tracing adds overhead. Only enable in development, never in production.
 
 ## Troubleshooting
 
-### "Xdebug extension not loaded"
-
-Install Xdebug:
+**"Xdebug extension not loaded"**
 ```bash
 pecl install xdebug
+# Add to php.ini: zend_extension=xdebug.so
 ```
 
-Then add to `php.ini`:
-```ini
-zend_extension=xdebug.so
-xdebug.mode=trace
-```
+**"Trace files not generated"**
+- Check Xdebug mode: `php -i | grep xdebug.mode` (should include "trace")
+- Ensure output directory exists and is writable
+- Verify bootstrap is loaded by checking for trace files after a request
 
-### "Trace files not generated"
-
-1. Check Xdebug mode: `php -i | grep xdebug.mode`
-2. Ensure output directory exists: `mkdir -p traces`
-3. Check permissions: `ls -ld traces/`
-4. Verify bootstrap is loaded: add `error_log('Trace loaded')` to bootstrap
-
-### Traces are empty
-
-Make sure `xdebug.mode` includes `trace`:
+**Empty traces**
 ```bash
 php -d xdebug.mode=trace your-script.php
 ```
 
-### "STDERR not defined" error
-
-This is fixed in the latest version. Update to ensure compatibility with web contexts.
-
-## Roadmap
-
-- [x] CLI script tracing
-- [x] Web request tracing
-- [x] Browser query parameter support
-- [x] Cookie-based activation
-- [x] .env file support
-- [x] Relative path output
-- [x] Docker compatibility
-- [x] Configuration system (`phptrace.php`)
-- [x] Configurable filtering
-- [x] PSR-12 code style compliance
-- [x] PHPStan level 8 static analysis
-- [x] Comprehensive test coverage
-- [ ] Include function arguments (optional)
-- [ ] Include return values (optional)
-- [ ] Web UI for viewing traces
-- [ ] Observer API extension for PHP 8.2+ (lower overhead)
-- [ ] Migration to latest PHP features (8.3+)
-
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) file for details.
 
-## Contributing
+## Support
 
-Contributions welcome! Please open an issue or PR.
-
-## Credits
-
-Built to solve the problem of explaining code execution paths to LLMs during debugging sessions.
+- **Issues**: [GitHub Issues](https://github.com/Chris-Kol/php-trace/issues)
+- **Documentation**: See examples in the `examples/` directory

@@ -5,6 +5,10 @@ on:
     tags:
       - "v*.*.*"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   validate:
     name: Validate Release
@@ -12,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -47,7 +51,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -70,31 +74,22 @@ jobs:
         id: extract_release_notes
         run: |
           # Extract just the latest release notes
-          awk '/^## \[?[0-9]/{if(++n==2) exit} n>=1' CHANGELOG.md > RELEASE_NOTES.md
-          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
-          cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          if [ -f CHANGELOG.md ]; then
+            awk '/^## \[?[0-9]/{if(++n==2) exit} n>=1' CHANGELOG.md > RELEASE_NOTES.md
+          else
+            echo "Release ${{ github.ref_name }}" > RELEASE_NOTES.md
+          fi
 
       - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: PHP-Trace ${{ github.ref_name }}
-          body: ${{ steps.extract_release_notes.outputs.release_notes }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            CHANGELOG.md
           draft: false
           prerelease: false
-
-      - name: Upload changelog as asset
-        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./CHANGELOG.md
-          asset_name: CHANGELOG.md
-          asset_content_type: text/markdown
 
       - name: Comment on success
         run: |

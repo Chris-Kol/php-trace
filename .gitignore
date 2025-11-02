@@ -2,10 +2,12 @@
 /vendor/
 composer.lock
 
-# Trace files
+# Trace files (but allow test fixtures)
 *.trace
 *.xt
 *.xt.gz
+!/tests/Fixtures/*.xt
+!/tests/Fixtures/*.xt.gz
 /tmp/
 /output/
 /traces/
@@ -20,7 +22,7 @@ composer.lock
 /var/
 /tmp/
 
-# IDE & OS  
+# IDE & OS
 .DS_Store
 .idea/
 .vscode/
