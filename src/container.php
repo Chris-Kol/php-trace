@@ -1,8 +1,6 @@
 <?php
 
 use DI\ContainerBuilder;
-use function DI\autowire;
-use function DI\get;
 use PhpTrace\Config\TraceConfig;
 use PhpTrace\Detector\CompositeDetector;
 use PhpTrace\Detector\CookieDetector;
@@ -19,6 +17,9 @@ use PhpTrace\Tracer\TracerInterface;
 use PhpTrace\Tracer\XdebugTracer;
 use PhpTrace\Writer\FileWriter;
 use PhpTrace\Writer\WriterInterface;
+
+use function DI\autowire;
+use function DI\get;
 
 // Build the container
 $containerBuilder = new ContainerBuilder();
