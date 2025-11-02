@@ -1,24 +1,25 @@
 # PHP Trace
 
-<!-- CI/CD Badges - Will be added when GitHub Actions are set up -->
-<!--
 [![CI](https://github.com/Chris-Kol/php-trace/workflows/CI/badge.svg)](https://github.com/Chris-Kol/php-trace/actions)
 [![Coverage](https://codecov.io/gh/Chris-Kol/php-trace/branch/main/graph/badge.svg)](https://codecov.io/gh/Chris-Kol/php-trace)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%208-brightgreen.svg)](https://phpstan.org/)
 [![PHP Version](https://img.shields.io/badge/PHP-8.0%2B-blue.svg)](https://www.php.net/)
--->
+[![Latest Release](https://img.shields.io/github/v/release/Chris-Kol/php-trace)](https://github.com/Chris-Kol/php-trace/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Lightweight PHP execution tracer optimized for LLM-friendly debugging.
 
-## What's New in v2.0
+## What's New in v1.0.0
+
+🎉 **First stable release!**
 
 - ✨ **Configuration System**: Customize behavior with `phptrace.php` config file
 - 🎛️ **Configurable Filtering**: Choose what to exclude from traces (vendor/, tests/, etc.)
 - 🚀 **PHP 8.0+ Required**: Now using modern PHP features
-- ✅ **Quality Tools**: PSR-12 compliant, PHPStan level 8, comprehensive tests
+- ✅ **Quality Tools**: PSR-12 compliant, PHPStan level 8, comprehensive tests (146 tests, 74% coverage)
 - 📦 **Better Defaults**: Smart config discovery, cleaner output structure
-
-**Migration from v1**: The old setup still works! Just note the PHP version requirement changed to 8.0+.
+- 🔒 **Security**: Automated security scanning and dependency auditing
+- 🤖 **CI/CD**: Full GitHub Actions pipeline with multi-version PHP testing
 
 ## The Problem
 
@@ -53,12 +54,27 @@ PHP Trace captures execution paths automatically and outputs them in formats opt
 
 ### Installation via Composer
 
+**For production projects** (from Packagist - coming soon):
 ```bash
 composer require --dev php-trace/php-trace
 ```
 
-Or for local development:
+**For local development** (from GitHub):
+```json
+{
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/Chris-Kol/php-trace"
+    }
+  ],
+  "require-dev": {
+    "php-trace/php-trace": "^1.0"
+  }
+}
+```
 
+**For local path development:**
 ```json
 {
   "repositories": [

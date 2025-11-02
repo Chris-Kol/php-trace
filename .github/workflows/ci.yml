@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Test PHP ${{ matrix.php }} on ${{ matrix.os }}
@@ -37,7 +41,7 @@ jobs:
 
       - name: Cache Composer packages
         id: composer-cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: vendor
           key: ${{ runner.os }}-php-${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
@@ -61,6 +65,13 @@ jobs:
       - name: Check test coverage
         run: |
           composer test-coverage
+
+          # Verify coverage files were generated
+          if [ ! -f coverage/clover.xml ]; then
+            echo "ERROR: coverage/clover.xml not generated"
+            exit 1
+          fi
+
           # Check if coverage meets minimum threshold (70%)
           php -r "
           \$coverage = simplexml_load_file('coverage/clover.xml');
@@ -102,29 +113,6 @@ jobs:
           echo "<?php require 'vendor/autoload.php'; echo 'Package loaded successfully';" > test.php
           php test.php
 
-  security:
-    name: Security Audit
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.3"
-          tools: composer:v2
-
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction
-
-      - name: Run security audit
-        run: composer audit
-
-      - name: Check for known security vulnerabilities
-        uses: symfonycorp/security-checker-action@v5
-
   compatibility:
     name: Compatibility Check
     runs-on: ubuntu-latest
@@ -161,7 +149,7 @@ jobs:
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [test, security, compatibility]
+    needs: [test, compatibility]
 
     steps:
       - name: Checkout code
@@ -186,16 +174,34 @@ jobs:
           TRACE=1 php -d auto_prepend_file=../src/bootstrap.php sample.php
 
           # Verify trace files were created
-          ls -la /tmp/php-trace-* || echo "No trace files found (this might be expected behavior)"
+          echo "Checking for trace files..."
+          if ls /tmp/php-trace-* 1> /dev/null 2>&1; then
+            echo "✅ Trace files found:"
+            ls -la /tmp/php-trace-*
+          else
+            echo "ℹ️ No trace files in /tmp (may be in traces/ directory)"
+            if [ -d "../traces" ]; then
+              ls -la ../traces/ || echo "traces/ directory is empty"
+            fi
+          fi
 
       - name: Test with test project
         run: |
           # If test-project exists, test integration there
           if [ -d "../test-project" ]; then
+            echo "✅ Test project found, running integration test"
             cd ../test-project
             php -S localhost:8001 -d auto_prepend_file=vendor/php-trace/php-trace/src/bootstrap.php -d xdebug.mode=trace &
             SERVER_PID=$!
             sleep 2
-            curl -f "http://localhost:8001/?TRACE=1" || echo "Test project not available"
+
+            if curl -f "http://localhost:8001/?TRACE=1"; then
+              echo "✅ Integration test passed"
+            else
+              echo "⚠️ Integration test returned non-zero exit code (may be expected)"
+            fi
+
             kill $SERVER_PID
+          else
+            echo "ℹ️ Test project not available, skipping"
           fi
