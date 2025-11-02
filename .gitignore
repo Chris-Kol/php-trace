@@ -1,0 +1,50 @@
+# Dependencies
+/vendor/
+composer.lock
+
+# Trace files
+*.trace
+*.xt
+*.xt.gz
+/tmp/
+/output/
+/traces/
+
+# Coverage reports
+/coverage/
+
+# PHPUnit cache
+.phpunit.result.cache
+
+# Runtime & Cache
+/var/
+/tmp/
+
+# IDE & OS  
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local config
+phptrace.php
+.env.local
+.env.*.local
+
+# Development documentation (moved to dev-docs/)
+/dev-docs/
+
+# Node modules (for Husky)
+node_modules/
+npm-debug.log*
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+
+# Backup files
+*.bak
+*.backup
+*.orig

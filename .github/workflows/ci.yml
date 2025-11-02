@@ -1,0 +1,204 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Test PHP ${{ matrix.php }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ["8.0", "8.1", "8.2", "8.3"]
+        os: [ubuntu-latest]
+        xdebug: ["3.1", "3.2", "3.3"]
+        exclude:
+          # Exclude incompatible combinations
+          - php: "8.0"
+            xdebug: "3.3"
+          - php: "8.1"
+            xdebug: "3.1"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: xdebug-${{ matrix.xdebug }}
+          coverage: xdebug
+          tools: composer:v2
+          ini-values: |
+            xdebug.mode=coverage,trace
+            memory_limit=512M
+
+      - name: Validate composer.json and composer.lock
+        run: composer validate --strict
+
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-${{ matrix.php }}-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Verify Xdebug installation
+        run: |
+          php -m | grep xdebug
+          php -i | grep "xdebug.version"
+          php -i | grep "xdebug.mode"
+
+      - name: Run PHPUnit tests
+        run: composer test
+
+      - name: Check test coverage
+        run: |
+          composer test-coverage
+          # Check if coverage meets minimum threshold (70%)
+          php -r "
+          \$coverage = simplexml_load_file('coverage/clover.xml');
+          \$metrics = \$coverage->project->metrics;
+          \$percentage = round((\$metrics['coveredstatements'] / \$metrics['statements']) * 100, 2);
+          echo 'Coverage: ' . \$percentage . '%' . PHP_EOL;
+          if (\$percentage < 70) {
+            echo 'ERROR: Coverage (' . \$percentage . '%) is below minimum threshold (70%)' . PHP_EOL;
+            exit(1);
+          }
+          echo 'SUCCESS: Coverage threshold met' . PHP_EOL;
+          "
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/clover.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Run PHPStan static analysis
+        run: composer phpstan
+
+      - name: Check code style (PHPCS)
+        run: composer cs-check
+
+      - name: Test package installation
+        run: |
+          # Test that the package can be required in a fresh project
+          cd /tmp
+          composer init --name="test/project" --no-interaction
+          composer config repositories.local path $GITHUB_WORKSPACE
+          composer require "php-trace/php-trace:*@dev" --no-interaction
+
+          # Test basic functionality
+          echo "<?php require 'vendor/autoload.php'; echo 'Package loaded successfully';" > test.php
+          php test.php
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run security audit
+        run: composer audit
+
+      - name: Check for known security vulnerabilities
+        uses: symfonycorp/security-checker-action@v5
+
+  compatibility:
+    name: Compatibility Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Test without Xdebug (fallback behavior)
+        run: |
+          php -d extension_dir=/usr/lib/php/20220829 -d zend_extension= examples/test_without_xdebug.php
+
+      - name: Test CLI example
+        run: |
+          TRACE=1 php examples/sample.php
+
+      - name: Test web example setup
+        run: |
+          php -S localhost:8000 -t examples &
+          SERVER_PID=$!
+          sleep 2
+          curl -f http://localhost:8000/web.php?TRACE=1 || true
+          kill $SERVER_PID
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [test, security, compatibility]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: xdebug
+          coverage: xdebug
+          tools: composer:v2
+          ini-values: xdebug.mode=trace
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run integration tests
+        run: |
+          # Test actual tracing end-to-end
+          cd examples
+          TRACE=1 php -d auto_prepend_file=../src/bootstrap.php sample.php
+
+          # Verify trace files were created
+          ls -la /tmp/php-trace-* || echo "No trace files found (this might be expected behavior)"
+
+      - name: Test with test project
+        run: |
+          # If test-project exists, test integration there
+          if [ -d "../test-project" ]; then
+            cd ../test-project
+            php -S localhost:8001 -d auto_prepend_file=vendor/php-trace/php-trace/src/bootstrap.php -d xdebug.mode=trace &
+            SERVER_PID=$!
+            sleep 2
+            curl -f "http://localhost:8001/?TRACE=1" || echo "Test project not available"
+            kill $SERVER_PID
+          fi

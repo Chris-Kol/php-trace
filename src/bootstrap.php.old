@@ -1,0 +1,213 @@
+<?php
+
+/**
+ * PHP Trace Bootstrap
+ *
+ * This file can be used as an auto_prepend_file to automatically
+ * enable tracing when the TRACE environment variable is set.
+ *
+ * Usage:
+ *   TRACE=1 php your-script.php
+ *
+ * Or add to php.ini:
+ *   auto_prepend_file=/path/to/php-trace/src/bootstrap.php
+ */
+
+// Check if tracing is enabled via:
+// 1. Environment variable (CLI): TRACE=1
+// 2. .env file: TRACE=1
+// 3. Query parameter (Browser): ?TRACE=1
+// 4. Cookie (Browser): TRACE=1
+$isTraceEnabled = false;
+
+// Check environment variable
+if (getenv('TRACE') === '1') {
+    $isTraceEnabled = true;
+}
+
+// Check .env file (look for it in parent directories)
+if (!$isTraceEnabled) {
+    $currentDir = getcwd();
+    if ($currentDir !== false) {
+        $maxLevels = 5;
+
+        for ($i = 0; $i < $maxLevels; $i++) {
+            $envFile = $currentDir . '/.env';
+            if (file_exists($envFile)) {
+                $envContent = file_get_contents($envFile);
+                if ($envContent !== false && preg_match('/^\s*TRACE\s*=\s*1\s*$/m', $envContent)) {
+                    $isTraceEnabled = true;
+                    break;
+                }
+            }
+            $parentDir = dirname($currentDir);
+            if ($parentDir === $currentDir) {
+                break;
+            }
+            $currentDir = $parentDir;
+        }
+    }
+}
+
+// Check query parameter
+if (!$isTraceEnabled && isset($_GET['TRACE']) && $_GET['TRACE'] === '1') {
+    $isTraceEnabled = true;
+}
+
+// Check cookie
+if (!$isTraceEnabled && isset($_COOKIE['TRACE']) && $_COOKIE['TRACE'] === '1') {
+    $isTraceEnabled = true;
+}
+
+if (!$isTraceEnabled) {
+    return;
+}
+
+// Check if Xdebug is available
+if (!extension_loaded('xdebug')) {
+    error_log('[PHP-Trace] Warning: Xdebug extension not loaded. Tracing disabled.');
+    return;
+}
+
+// Check if xdebug_start_trace function exists (Xdebug 2/3 compatibility)
+if (!function_exists('xdebug_start_trace')) {
+    error_log('[PHP-Trace] Warning: xdebug_start_trace() not available. Make sure Xdebug is properly configured.');
+    return;
+}
+
+// Load configuration
+$config = PhpTrace\Config\TraceConfig::load();
+
+// Output directory - priority: ENV var > config file > default
+$outputDir = getenv('TRACE_OUTPUT_DIR');
+
+if (!$outputDir) {
+    $outputDir = $config->getOutputDir();
+
+    // Make it absolute if it's relative
+    if (!str_starts_with($outputDir, '/')) {
+        $currentDir = getcwd();
+        if ($currentDir !== false) {
+            $outputDir = $currentDir . '/' . $outputDir;
+        } else {
+            $outputDir = '/tmp';
+        }
+    }
+}
+
+$timestamp = date('Y-m-d_H-i-s');
+
+// Include request info in filename for browser requests
+$requestInfo = '';
+if (isset($_SERVER['REQUEST_METHOD']) && isset($_SERVER['REQUEST_URI'])) {
+    $method = $_SERVER['REQUEST_METHOD'];
+    $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    $uri = is_string($uri) ? str_replace('/', '_', trim($uri, '/')) : '';
+    $uri = $uri !== '' ? $uri : 'index';
+    $requestInfo = '-' . strtolower($method) . '-' . $uri;
+}
+
+$traceFile = $outputDir . '/php-trace-' . $timestamp . $requestInfo;
+
+// Ensure output directory exists
+if (!is_dir($outputDir)) {
+    mkdir($outputDir, 0755, true);
+}
+
+// Start Xdebug trace
+// Enable trace mode
+ini_set('xdebug.mode', 'trace');
+// Format 1 = computer-readable (tab-separated)
+ini_set('xdebug.trace_format', '1');
+ini_set('xdebug.collect_params', '0'); // Don't collect params for now (faster)
+ini_set('xdebug.collect_return', '0'); // Don't collect return values (faster)
+ini_set('xdebug.collect_assignments', '0');
+
+xdebug_start_trace($traceFile);
+
+// Register shutdown function to process the trace
+register_shutdown_function(function () use ($traceFile, $outputDir, $timestamp, $config) {
+    // Stop tracing
+    xdebug_stop_trace();
+
+    // Load the trace parser and formatters
+    $autoloadPaths = [
+        __DIR__ . '/../vendor/autoload.php', // If installed via composer
+        __DIR__ . '/TraceParser.php',         // Direct path
+        __DIR__ . '/JsonFormatter.php',
+        __DIR__ . '/MarkdownFormatter.php',
+    ];
+
+    foreach ($autoloadPaths as $autoload) {
+        if (file_exists($autoload)) {
+            require_once $autoload;
+        }
+    }
+
+    // Check if we can load classes manually (in case autoload doesn't work)
+    if (!class_exists('PhpTrace\TraceParser')) {
+        require_once __DIR__ . '/TraceParser.php';
+        require_once __DIR__ . '/JsonFormatter.php';
+        require_once __DIR__ . '/MarkdownFormatter.php';
+    }
+
+    try {
+        // Find the trace file (could be .xt or .xt.gz)
+        $actualTraceFile = null;
+        if (file_exists($traceFile . '.xt')) {
+            $actualTraceFile = $traceFile . '.xt';
+        } elseif (file_exists($traceFile . '.xt.gz')) {
+            // Decompress the gzipped trace file
+            $gzContent = file_get_contents($traceFile . '.xt.gz');
+            if ($gzContent !== false) {
+                $content = gzdecode($gzContent);
+                $actualTraceFile = $traceFile . '.xt';
+                file_put_contents($actualTraceFile, $content);
+            }
+        }
+
+        if (!$actualTraceFile) {
+            throw new Exception('Trace file not found: ' . $traceFile . '.xt or .xt.gz');
+        }
+
+        // Parse the trace file
+        $parser = new PhpTrace\TraceParser($config->getExcludePatterns());
+        $traceData = $parser->parse($actualTraceFile);
+
+        // Format as JSON
+        $jsonFormatter = new PhpTrace\JsonFormatter();
+        $jsonOutput = $jsonFormatter->format($traceData);
+        $jsonFile = $outputDir . '/php-trace-' . $timestamp . '.json';
+        file_put_contents($jsonFile, $jsonOutput);
+
+        // Format as Markdown
+        $markdownFormatter = new PhpTrace\MarkdownFormatter();
+        $markdownOutput = $markdownFormatter->format($traceData);
+        $markdownFile = $outputDir . '/php-trace-' . $timestamp . '.md';
+        file_put_contents($markdownFile, $markdownOutput);
+
+        // Output file paths to stderr for easy discovery (CLI only)
+        if (defined('STDERR')) {
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "[PHP-Trace] Trace files generated:\n");
+            fwrite(STDERR, "[PHP-Trace]   JSON: {$jsonFile}\n");
+            fwrite(STDERR, "[PHP-Trace]   Markdown: {$markdownFile}\n");
+            fwrite(STDERR, "\n");
+        } else {
+            // Log for web context
+            error_log("[PHP-Trace] Trace files generated: {$jsonFile}, {$markdownFile}");
+        }
+
+        // Clean up raw trace files
+        if (file_exists($traceFile . '.xt')) {
+            unlink($traceFile . '.xt');
+        }
+        if (file_exists($traceFile . '.xt.gz')) {
+            unlink($traceFile . '.xt.gz');
+        }
+    } catch (Exception $e) {
+        error_log('[PHP-Trace] Error processing trace: ' . $e->getMessage());
+    }
+});
+
+// Silent success - tracing is now active

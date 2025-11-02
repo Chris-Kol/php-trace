@@ -1,0 +1,34 @@
+<?php
+
+/**
+ * PHP-Trace Configuration
+ *
+ * Copy this file to phptrace.php and customize as needed.
+ */
+
+return [
+    /**
+     * Patterns to exclude from traces
+     *
+     * By default, vendor and composer directories are excluded.
+     * Set to empty array [] to include everything.
+     */
+    'exclude_patterns' => [
+        'vendor/',
+        'composer/',
+    ],
+
+    /**
+     * Directory to write trace files
+     *
+     * Relative to the project root.
+     */
+    'output_dir' => 'traces',
+
+    /**
+     * Output formats to generate
+     *
+     * Available: 'json', 'markdown'
+     */
+    'formats' => ['json', 'markdown'],
+];

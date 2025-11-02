@@ -1,0 +1,49 @@
+{
+  "name": "php-trace-dev-tools",
+  "version": "1.0.0",
+  "description": "Development tools and pre-commit hooks for PHP-Trace",
+  "private": true,
+  "scripts": {
+    "prepare": "husky install",
+    "pre-commit": "lint-staged",
+    "setup": "npm install && composer install",
+    "validate": "npm run validate:composer && npm run validate:php",
+    "validate:composer": "composer validate --strict",
+    "validate:php": "composer test && composer phpstan && composer cs-check"
+  },
+  "devDependencies": {
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0"
+  },
+  "lint-staged": {
+    "*.php": [
+      "php -l",
+      "composer cs-fix --",
+      "git add"
+    ],
+    "composer.json": [
+      "composer validate --strict"
+    ],
+    "*.{md,yml,yaml,json}": [
+      "echo 'Validating documentation files...'"
+    ]
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "php",
+    "xdebug",
+    "tracing",
+    "debugging",
+    "development-tools",
+    "pre-commit-hooks"
+  ],
+  "author": "PHP-Trace Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Chris-Kol/php-trace.git"
+  }
+}

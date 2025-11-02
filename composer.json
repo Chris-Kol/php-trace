@@ -1,0 +1,51 @@
+{
+    "name": "php-trace/php-trace",
+    "description": "Lightweight PHP execution tracer optimized for LLM-friendly debugging",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["debugging", "trace", "xdebug", "profiling", "llm", "ai"],
+    "homepage": "https://github.com/Chris-Kol/php-trace",
+    "authors": [
+        {
+            "name": "Chris Kol",
+            "email": "christina.koleri@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.0",
+        "ext-xdebug": "*",
+        "php-di/php-di": "^7.1"
+    },
+    "suggest": {
+        "ext-xdebug": "Required for tracing functionality"
+    },
+    "autoload": {
+        "psr-4": {
+            "PhpTrace\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PhpTrace\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit --no-coverage",
+        "test-coverage": "@php -d xdebug.mode=coverage vendor/bin/phpunit --coverage-html coverage --coverage-clover coverage/clover.xml",
+        "test-coverage-text": "@php -d xdebug.mode=coverage vendor/bin/phpunit --coverage-text",
+        "cs-check": "phpcs",
+        "cs-fix": "phpcbf",
+        "phpstan": "phpstan analyze --memory-limit=256M"
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true
+    },
+    "require-dev": {
+        "mockery/mockery": "^1.5",
+        "phpstan/phpstan": "^1.0",
+        "phpstan/phpstan-mockery": "^1.1",
+        "phpunit/phpunit": "^9.5",
+        "squizlabs/php_codesniffer": "^3.0"
+    }
+}
