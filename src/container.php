@@ -1,6 +1,8 @@
 <?php
 
 use DI\ContainerBuilder;
+use function DI\autowire;
+use function DI\get;
 use PhpTrace\Config\TraceConfig;
 use PhpTrace\Detector\CompositeDetector;
 use PhpTrace\Detector\CookieDetector;
@@ -66,6 +68,10 @@ $containerBuilder->addDefinitions([
             directoryPermissions: 0755
         );
     },
+
+    // TraceManager (autowire with explicit formatters parameter)
+    \PhpTrace\TraceManager::class => autowire()
+        ->constructorParameter('formatters', get('formatters')),
 ]);
 
 return $containerBuilder->build();
