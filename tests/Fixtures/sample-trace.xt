@@ -1,0 +1,13 @@
+Version: 3.3.2
+File format: 4
+TRACE START [2025-10-31 16:52:22.123456]
+1	0	0	0.000123	123456	{main}	1		/Users/ckoleri/code/test-project/index.php	0	0
+2	1	0	0.000234	234567	greet	0		/Users/ckoleri/code/test-project/index.php	5	1	$name = 'World'
+3	2	0	0.000345	345678	strtoupper	0		/Users/ckoleri/code/test-project/index.php	7	1	$name = 'World'
+3	2	1	0.000456	345700	strtoupper	0		/Users/ckoleri/code/test-project/index.php	7	0
+2	1	1	0.000567	234600	greet	0		/Users/ckoleri/code/test-project/index.php	5	0
+2	3	0	0.000678	234700	slowFunction	0		/Users/ckoleri/code/test-project/index.php	10	0
+2	3	1	0.150789	234800	slowFunction	0		/Users/ckoleri/code/test-project/index.php	10	0
+1	0	1	0.150890	123500	{main}	1		/Users/ckoleri/code/test-project/index.php	0	0
+			0.150890	123500
+TRACE END   [2025-10-31 16:52:22.274346]
