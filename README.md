@@ -283,9 +283,7 @@ return [
 
 ## Performance
 
-- **With tracing**: 2-7x slowdown (development only, disable in production)
-- **Without tracing**: Near-zero overhead
-- **File size**: ~1-5KB per trace
+⚠️ **Important**: Xdebug tracing adds overhead. Only enable in development, never in production.
 
 ## Troubleshooting
 
